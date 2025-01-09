@@ -67,7 +67,7 @@ if st.button("AI 기반 주가 예측"):
 # 뉴스 및 소셜 분석
 if st.button("뉴스 및 소셜 분석"):
     query = stock_name + " 뉴스"
-    url = f"https://newsapi.org/v2/everything?q={query}&apiKey=YOUR_NEWSAPI_KEY"
+    url = f"https://newsapi.org/v2/everything?q={query}&apiKey=cd5098d67b0242df91db6a121493ef4f"
     response = requests.get(url)
     if response.status_code == 200:
         articles = response.json()["articles"]
