@@ -7,3 +7,4 @@ scikit-learn
 textblob
 requests
 transformers
+torch
