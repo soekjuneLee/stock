@@ -64,7 +64,8 @@ if st.button("AI 기반 주가 예측"):
     for i in range(30):
         forecast_value = model.predict(forecast_data[['Close']].values[-1].reshape(1, -1))  # 마지막 값으로 예측
         predictions.append(forecast_value[0])  # 예측된 값 추가
-        forecast_data = forecast_data.append(pd.DataFrame({'Close': [forecast_value[0]]}), ignore_index=True)  # 예측값을 데이터에 추가
+        # 수정된 부분: concat을 사용하여 예측값을 데이터에 추가
+        forecast_data = pd.concat([forecast_data, pd.DataFrame({'Close': [forecast_value[0]]})], ignore_index=True)
 
     # 예측된 데이터와 실제 데이터 합치기
     full_data = pd.concat([data[['Close']], pd.Series(predictions, name='Prediction')], ignore_index=True)
