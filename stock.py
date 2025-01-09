@@ -76,7 +76,11 @@ if st.button("뉴스 및 소셜 분석"):
             st.write(f"- [{article['title']}]({article['url']})")
         
         # 뉴스 기사 감정 분석
-        sentiment_analyzer = pipeline("sentiment-analysis")
+        try:
+            sentiment_analyzer = pipeline("sentiment-analysis")
+        except RuntimeError as e:
+            st.write(f"Sentiment analysis pipeline error: {e}")
+
         sentiments = []
         for article in articles[:5]:
             title = article["title"]
