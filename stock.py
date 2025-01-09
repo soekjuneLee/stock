@@ -7,6 +7,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 from textblob import TextBlob
 import requests
+from transformers import pipeline
 
 # UI 구성
 st.title("주식 투자 추천 프로그램")
@@ -55,31 +56,13 @@ if st.button("AI 기반 주가 예측"):
     model = LinearRegression()
     model.fit(X_train, y_train)
 
-    # 예측을 위한 초기 데이터
-    forecast_data = data[['Close']].copy()
-    forecast_data = forecast_data[-30:].copy()  # 마지막 30일 데이터 사용
-
-    # 예측 시작
-    predictions = []
-    for i in range(30):
-        forecast_value = model.predict(forecast_data[['Close']].values[-1].reshape(1, -1))  # 마지막 값으로 예측
-        predictions.append(forecast_value[0])  # 예측된 값 추가
-        # 수정된 부분: concat을 사용하여 예측값을 데이터에 추가
-        forecast_data = pd.concat([forecast_data, pd.DataFrame({'Close': [forecast_value[0]]})], ignore_index=True)
-
-    # 예측된 데이터와 실제 데이터 합치기
-    full_data = pd.concat([data[['Close']], pd.Series(predictions, name='Prediction')], ignore_index=True)
+    # 예측
+    X_forecast = np.array(data[['Close']])[-30:]
+    predictions = model.predict(X_forecast)
 
     # 결과 표시
-    st.write("예측된 주가:")
-    fig, ax = plt.subplots()
-    ax.plot(data.index, data['Close'], label="실제 주가")
-    ax.plot(pd.date_range(data.index[-1], periods=31, freq='D')[1:], predictions, label="예측 주가", linestyle="--")
-    ax.set_xlabel("날짜")
-    ax.set_ylabel("주가")
-    ax.set_title(f"{stock_name} 주가 예측")
-    ax.legend()
-    st.pyplot(fig)
+    st.write("30일 이후 주가 예측:")
+    st.line_chart(predictions)
 
 # 뉴스 및 소셜 분석
 if st.button("뉴스 및 소셜 분석"):
@@ -91,6 +74,19 @@ if st.button("뉴스 및 소셜 분석"):
         st.write("최신 뉴스:")
         for article in articles[:5]:
             st.write(f"- [{article['title']}]({article['url']})")
+        
+        # 뉴스 기사 감정 분석
+        sentiment_analyzer = pipeline("sentiment-analysis")
+        sentiments = []
+        for article in articles[:5]:
+            title = article["title"]
+            sentiment = sentiment_analyzer(title)[0]
+            sentiment_score = sentiment["score"] if sentiment["label"] == "POSITIVE" else -sentiment["score"]
+            sentiments.append({"Title": title, "Sentiment": sentiment["label"], "Score": sentiment_score})
+        
+        st.write("감정 분석 결과:")
+        sentiment_df = pd.DataFrame(sentiments)
+        st.write(sentiment_df)
     else:
         st.write("뉴스 데이터를 불러올 수 없습니다.")
 
