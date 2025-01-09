@@ -8,6 +8,8 @@ from sklearn.linear_model import LinearRegression
 from textblob import TextBlob
 import requests
 from transformers import pipeline
+import torch
+import tensorflow as tf
 
 # UI 구성
 st.title("주식 투자 추천 프로그램")
