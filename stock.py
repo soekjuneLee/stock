@@ -7,6 +7,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 from textblob import TextBlob
 import requests
+from transformers import pipeline
 
 # UI 구성
 st.title("주식 투자 추천 프로그램")
@@ -73,6 +74,19 @@ if st.button("뉴스 및 소셜 분석"):
         st.write("최신 뉴스:")
         for article in articles[:5]:
             st.write(f"- [{article['title']}]({article['url']})")
+        
+        # 뉴스 기사 감정 분석
+        sentiment_analyzer = pipeline("sentiment-analysis")
+        sentiments = []
+        for article in articles[:5]:
+            title = article["title"]
+            sentiment = sentiment_analyzer(title)[0]
+            sentiment_score = sentiment["score"] if sentiment["label"] == "POSITIVE" else -sentiment["score"]
+            sentiments.append({"Title": title, "Sentiment": sentiment["label"], "Score": sentiment_score})
+        
+        st.write("감정 분석 결과:")
+        sentiment_df = pd.DataFrame(sentiments)
+        st.write(sentiment_df)
     else:
         st.write("뉴스 데이터를 불러올 수 없습니다.")
 
