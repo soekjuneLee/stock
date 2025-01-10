@@ -1,3 +1,4 @@
+import streamlit as st
 import yfinance as yf
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -77,11 +78,18 @@ def predict_investment(ticker):
     prediction = model.predict(latest_data)
     
     if prediction == 1:
-        print(f"{ticker} 주식에 투자하세요!")
+        st.write(f"{ticker} 주식에 투자하세요!")
     else:
-        print(f"{ticker} 주식은 투자하지 마세요.")
+        st.write(f"{ticker} 주식은 투자하지 마세요.")
+    
+    # 주식 차트 표시
+    st.write(f"{ticker}의 주식 데이터 차트")
+    fig, ax = plt.subplots()
+    stock_data['Close'].plot(ax=ax)
+    st.pyplot(fig)
 
 # 프로그램 실행
 if __name__ == "__main__":
-    ticker = 'AAPL'  # 예시: 애플 주식
-    predict_investment(ticker)
+    ticker = st.text_input("주식 종목을 입력하세요:", 'AAPL')  # 예시: 애플 주식
+    if ticker:
+        predict_investment(ticker)
