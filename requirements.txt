@@ -9,3 +9,5 @@ scikit-learn
 textblob
 tensorflow
 tf-keras
+newspaper3k
+vaderSentiment
