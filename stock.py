@@ -159,8 +159,12 @@ if st.button("AI 기반 주가 예측"):
     X_train, y_train = create_dataset(train_data, time_step)
     X_test, y_test = create_dataset(test_data, time_step)
 
-    X_train = X_train.reshape(X_train.shape[0], X_train.shape[1], 1)
-    X_test = X_test.reshape(X_test.shape[0], X_test.shape[1], 1)
+    # 데이터 길이 확인
+    if len(X_test) == 0 or len(X_test.shape) < 2:
+        st.write("테스트 데이터가 부족합니다. 데이터를 더 확보하거나 time_step 값을 조정하세요.")
+    else:
+        X_train = X_train.reshape(X_train.shape[0], X_train.shape[1], 1)
+        X_test = X_test.reshape(X_test.shape[0], X_test.shape[1], 1)
 
     # LSTM 모델 정의
     model = Sequential()
