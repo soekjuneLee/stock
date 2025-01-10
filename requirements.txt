@@ -1,9 +1,10 @@
+streamlit
+yfinance
 requests
 beautifulsoup4
-lxml
-yfinance
-numpy
-matplotlib
+pandas
 scikit-learn
-tensorflow
+nltk
 vaderSentiment
+matplotlib
+seaborn
