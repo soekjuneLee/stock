@@ -47,7 +47,7 @@ if st.button("AI 기반 주가 예측"):
     test_data = scaled_data[train_size:]
 
     # LSTM 입력 데이터 준비
-    def create_dataset(dataset, time_step=50):
+    def create_dataset(dataset, time_step=30):
         X, y = [], []
         for i in range(len(dataset) - time_step - 1):
             X.append(dataset[i:(i + time_step), 0])
