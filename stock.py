@@ -5,8 +5,6 @@ import numpy as np
 from sklearn.preprocessing import MinMaxScaler
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import LSTM, Dense, Dropout
-from transformers import pipeline
-import requests
 import matplotlib.pyplot as plt
 
 # Streamlit UI 구성
@@ -105,39 +103,9 @@ period_mapping = {"1개월": "1mo", "3개월": "3mo", "6개월": "6mo", "1년": 
 interval = st.selectbox("데이터 간격", ["일봉", "주봉"])
 interval_mapping = {"일봉": "1d", "주봉": "1wk"}
 
-# 데이터 가져오기
-if st.button("데이터 가져오기"):
-    data = yf.download(ticker, period=period_mapping[period], interval=interval_mapping[interval])
-    st.write(data)
-
-# 뉴스 및 소셜 분석 감정 점수 계산
-sentiment_score = 0
-if st.button("뉴스 및 소셜 분석"):
-    query = stock_name + " 뉴스"
-    url = f"https://newsapi.org/v2/everything?q={query}&apiKey=cd5098d67b0242df91db6a121493ef4f"
-    response = requests.get(url)
-    if response.status_code == 200:
-        articles = response.json()["articles"]
-        st.write("최신 뉴스:")
-        for article in articles[:5]:
-            st.write(f"- [{article['title']}]({article['url']})")
-        
-        # 뉴스 감정 분석
-        sentiment_analyzer = pipeline("sentiment-analysis")
-        for article in articles[:5]:
-            title = article["title"]
-            sentiment = sentiment_analyzer(title)[0]
-            if sentiment["label"] == "POSITIVE":
-                sentiment_score += sentiment["score"]
-            elif sentiment["label"] == "NEGATIVE":
-                sentiment_score -= sentiment["score"]
-        st.write(f"총 감정 점수: {sentiment_score}")
-    else:
-        st.write("뉴스 데이터를 불러올 수 없습니다.")
-
 # LSTM 기반 AI 주가 예측
 if st.button("AI 기반 주가 예측"):
-    data = yf.download(ticker, period="1y", interval="1d")  # 1년치 데이터로 예측
+    data = yf.download(ticker, period="5y", interval="1d")  # 5년치 데이터로 예측
     data = data[['Close']]  # 'Close' 컬럼만 사용
     scaler = MinMaxScaler(feature_range=(0, 1))
     scaled_data = scaler.fit_transform(data)
@@ -159,41 +127,30 @@ if st.button("AI 기반 주가 예측"):
     X_train, y_train = create_dataset(train_data, time_step)
     X_test, y_test = create_dataset(test_data, time_step)
 
-    # 데이터 길이 확인
     if len(X_test) == 0 or len(X_test.shape) < 2:
         st.write("테스트 데이터가 부족합니다. 데이터를 더 확보하거나 time_step 값을 조정하세요.")
     else:
         X_train = X_train.reshape(X_train.shape[0], X_train.shape[1], 1)
         X_test = X_test.reshape(X_test.shape[0], X_test.shape[1], 1)
 
-    # LSTM 모델 정의
-    model = Sequential()
-    model.add(LSTM(50, return_sequences=True, input_shape=(time_step, 1)))
-    model.add(LSTM(50, return_sequences=False))
-    model.add(Dropout(0.2))
-    model.add(Dense(25))
-    model.add(Dense(1))
+        # LSTM 모델 정의
+        model = Sequential()
+        model.add(LSTM(50, return_sequences=True, input_shape=(time_step, 1)))
+        model.add(LSTM(50, return_sequences=False))
+        model.add(Dropout(0.2))
+        model.add(Dense(25))
+        model.add(Dense(1))
 
-    model.compile(optimizer='adam', loss='mean_squared_error')
-    model.fit(X_train, y_train, batch_size=64, epochs=10, verbose=1)
+        model.compile(optimizer='adam', loss='mean_squared_error')
+        model.fit(X_train, y_train, batch_size=64, epochs=10, verbose=1)
 
-    # 예측 및 시각화
-    predictions = model.predict(X_test)
-    predictions = scaler.inverse_transform(predictions)
+        # 예측 및 시각화
+        predictions = model.predict(X_test)
+        predictions = scaler.inverse_transform(predictions)
 
-    st.write("테스트 데이터 예측 결과:")
-    plt.figure(figsize=(14, 7))
-    plt.plot(scaler.inverse_transform(test_data[time_step:]), label="실제 주가")
-    plt.plot(predictions, label="예측 주가")
-    plt.legend()
-    st.pyplot(plt)
-
-    # 뉴스 감정 점수 기반 조정
-    sentiment_adjustment = sentiment_score * 0.01  # 감정 점수를 기반으로 주가 조정
-    adjusted_predictions = predictions + sentiment_adjustment
-    st.write("감정 점수 반영 후 예측 결과:")
-    plt.figure(figsize=(14, 7))
-    plt.plot(scaler.inverse_transform(test_data[time_step:]), label="실제 주가")
-    plt.plot(adjusted_predictions, label="조정된 예측 주가")
-    plt.legend()
-    st.pyplot(plt)
+        st.write("테스트 데이터 예측 결과:")
+        plt.figure(figsize=(14, 7))
+        plt.plot(scaler.inverse_transform(test_data[time_step:]), label="실제 주가")
+        plt.plot(predictions, label="예측 주가")
+        plt.legend()
+        st.pyplot(plt)
