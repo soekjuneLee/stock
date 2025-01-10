@@ -1,6 +1,5 @@
 import streamlit as st
 import yfinance as yf
-import pandas as pd
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
 from tensorflow.keras.models import Sequential
@@ -18,7 +17,6 @@ ticker_dict = {
     "LG전자": "066570.KS",
     "네이버": "035420.KS",
     "카카오": "035720.KS",
-    # 필요한 종목 추가 가능
 }
 
 # 사용자 입력 받기
@@ -58,53 +56,43 @@ if st.button("AI 기반 주가 예측"):
     X_train, y_train = create_dataset(train_data, time_step)
     X_test, y_test = create_dataset(test_data, time_step)
 
-    # X_train과 X_test의 형상 확인
-    st.write(f"X_train shape: {X_train.shape}")
-    st.write(f"X_test shape: {X_test.shape}")
+    # X_train과 X_test reshape
+    X_train = X_train.reshape(X_train.shape[0], X_train.shape[1], 1)
+    X_test = X_test.reshape(X_test.shape[0], X_test.shape[1], 1)
 
-    if X_train.shape[1] != time_step:
-        st.write("Warning: X_train의 차원과 time_step이 맞지 않거나 데이터가 부족할 수 있습니다.")
-    
-    # X_train과 X_test가 제대로 생성되었는지 확인한 후 reshape
-    if len(X_train.shape) == 2:
-        X_train = X_train.reshape(X_train.shape[0], X_train.shape[1], 1)
-        X_test = X_test.reshape(X_test.shape[0], X_test.shape[1], 1)
+    # LSTM 모델 정의
+    model = Sequential()
+    model.add(LSTM(50, return_sequences=True, input_shape=(time_step, 1)))
+    model.add(LSTM(50, return_sequences=False))
+    model.add(Dropout(0.2))
+    model.add(Dense(25))
+    model.add(Dense(1))
 
-        # LSTM 모델 정의
-        model = Sequential()
-        model.add(LSTM(50, return_sequences=True, input_shape=(time_step, 1)))
-        model.add(LSTM(50, return_sequences=False))
-        model.add(Dropout(0.2))
-        model.add(Dense(25))
-        model.add(Dense(1))
+    model.compile(optimizer='adam', loss='mean_squared_error')
+    model.fit(X_train, y_train, batch_size=64, epochs=10, verbose=1)
 
-        model.compile(optimizer='adam', loss='mean_squared_error')
-        model.fit(X_train, y_train, batch_size=64, epochs=10, verbose=1)
+    # 예측 및 시각화
+    predictions = model.predict(X_test)
+    predictions = scaler.inverse_transform(predictions)
 
-        # 예측 및 시각화
-        predictions = model.predict(X_test)
-        predictions = scaler.inverse_transform(predictions)
+    # 예측 결과 출력
+    st.write("예측된 주가 결과:")
+    plt.figure(figsize=(14, 7))
+    plt.plot(scaler.inverse_transform(test_data[time_step:]), label="Actual Price")  # 실제 주가
+    plt.plot(predictions, label="Predicted Price")  # 예측 주가
+    plt.xlabel("Date")  # X축: 날짜
+    plt.ylabel("Price")  # Y축: 주가
+    plt.legend()
+    st.pyplot(plt)
 
-        # 예측 결과 출력
-        st.write("예측된 주가 결과:")
-        plt.figure(figsize=(14, 7))
-        plt.plot(scaler.inverse_transform(test_data[time_step:]), label="Actual Price")  # 실제 주가
-        plt.plot(predictions, label="Predicted Price")  # 예측 주가
-        plt.xlabel("Date")  # X축: 날짜
-        plt.ylabel("Price")  # Y축: 주가
-        plt.legend()
-        st.pyplot(plt)
+    # 예측된 주가를 기반으로 투자 판단
+    last_actual_price = scaler.inverse_transform(test_data[-1].reshape(1, -1))[0][0]
+    last_predicted_price = predictions[-1][0]
 
-        # 예측된 주가를 기반으로 투자 판단
-        last_actual_price = scaler.inverse_transform(test_data[-1].reshape(1, -1))[0][0]
-        last_predicted_price = predictions[-1][0]
+    st.write(f"현재 주가: {last_actual_price:.2f} 원")
+    st.write(f"예측된 주가: {last_predicted_price:.2f} 원")
 
-        st.write(f"현재 주가: {last_actual_price:.2f} 원")
-        st.write(f"예측된 주가: {last_predicted_price:.2f} 원")
-
-        if last_predicted_price > last_actual_price:
-            st.write("예측에 따르면 주가는 상승할 것으로 예상됩니다. 투자를 고려해보세요.")
-        else:
-            st.write("예측에 따르면 주가는 하락할 것으로 예상됩니다. 신중히 판단하세요.")
+    if last_predicted_price > last_actual_price:
+        st.write("예측에 따르면 주가는 상승할 것으로 예상됩니다. 투자를 고려해보세요.")
     else:
-        st.write("데이터의 차원이 예상과 맞지 않아, 예측을 수행할 수 없습니다.")
+        st.write("예측에 따르면 주가는 하락할 것으로 예상됩니다. 신중히 판단하세요.")
