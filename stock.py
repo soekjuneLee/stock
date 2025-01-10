@@ -35,64 +35,71 @@ if st.button("AI 기반 주가 예측"):
     data = yf.download(ticker, period=period_mapping[period], interval=interval_mapping[interval])
     data = data[['Close']]  # 'Close' 컬럼만 사용
 
-    # 데이터 전처리
-    scaler = MinMaxScaler(feature_range=(0, 1))
-    scaled_data = scaler.fit_transform(data)
-
-    # 훈련 및 테스트 데이터 분리
-    train_size = int(len(scaled_data) * 0.8)
-    train_data = scaled_data[:train_size]
-    test_data = scaled_data[train_size:]
-
-    # LSTM 입력 데이터 준비
-    def create_dataset(dataset, time_step=50):
-        X, y = [], []
-        for i in range(len(dataset) - time_step - 1):
-            X.append(dataset[i:(i + time_step), 0])
-            y.append(dataset[i + time_step, 0])
-        return np.array(X), np.array(y)
-
-    time_step = 50
-    X_train, y_train = create_dataset(train_data, time_step)
-    X_test, y_test = create_dataset(test_data, time_step)
-
-    # X_train과 X_test reshape
-    X_train = X_train.reshape(X_train.shape[0], X_train.shape[1], 1)
-    X_test = X_test.reshape(X_test.shape[0], X_test.shape[1], 1)
-
-    # LSTM 모델 정의
-    model = Sequential()
-    model.add(LSTM(50, return_sequences=True, input_shape=(time_step, 1)))
-    model.add(LSTM(50, return_sequences=False))
-    model.add(Dropout(0.2))
-    model.add(Dense(25))
-    model.add(Dense(1))
-
-    model.compile(optimizer='adam', loss='mean_squared_error')
-    model.fit(X_train, y_train, batch_size=64, epochs=10, verbose=1)
-
-    # 예측 및 시각화
-    predictions = model.predict(X_test)
-    predictions = scaler.inverse_transform(predictions)
-
-    # 예측 결과 출력
-    st.write("예측된 주가 결과:")
-    plt.figure(figsize=(14, 7))
-    plt.plot(scaler.inverse_transform(test_data[time_step:]), label="Actual Price")  # 실제 주가
-    plt.plot(predictions, label="Predicted Price")  # 예측 주가
-    plt.xlabel("Date")  # X축: 날짜
-    plt.ylabel("Price")  # Y축: 주가
-    plt.legend()
-    st.pyplot(plt)
-
-    # 예측된 주가를 기반으로 투자 판단
-    last_actual_price = scaler.inverse_transform(test_data[-1].reshape(1, -1))[0][0]
-    last_predicted_price = predictions[-1][0]
-
-    st.write(f"현재 주가: {last_actual_price:.2f} 원")
-    st.write(f"예측된 주가: {last_predicted_price:.2f} 원")
-
-    if last_predicted_price > last_actual_price:
-        st.write("예측에 따르면 주가는 상승할 것으로 예상됩니다. 투자를 고려해보세요.")
+    if len(data) < 50:  # 데이터가 부족한 경우 예외 처리
+        st.error("데이터가 너무 적습니다. 기간을 더 길게 설정해주세요.")
     else:
-        st.write("예측에 따르면 주가는 하락할 것으로 예상됩니다. 신중히 판단하세요.")
+        # 데이터 전처리
+        scaler = MinMaxScaler(feature_range=(0, 1))
+        scaled_data = scaler.fit_transform(data)
+
+        # 훈련 및 테스트 데이터 분리
+        train_size = int(len(scaled_data) * 0.8)
+        train_data = scaled_data[:train_size]
+        test_data = scaled_data[train_size:]
+
+        # LSTM 입력 데이터 준비
+        def create_dataset(dataset, time_step=50):
+            X, y = [], []
+            for i in range(len(dataset) - time_step - 1):
+                X.append(dataset[i:(i + time_step), 0])
+                y.append(dataset[i + time_step, 0])
+            return np.array(X), np.array(y)
+
+        time_step = 50
+        X_train, y_train = create_dataset(train_data, time_step)
+        X_test, y_test = create_dataset(test_data, time_step)
+
+        # 데이터가 충분한지 확인
+        if X_train.shape[0] == 0 or X_test.shape[0] == 0:
+            st.error("시간 스텝을 너무 크게 설정했습니다. 더 작은 값으로 설정해 주세요.")
+        else:
+            # X_train과 X_test reshape
+            X_train = X_train.reshape(X_train.shape[0], X_train.shape[1], 1)
+            X_test = X_test.reshape(X_test.shape[0], X_test.shape[1], 1)
+
+            # LSTM 모델 정의
+            model = Sequential()
+            model.add(LSTM(50, return_sequences=True, input_shape=(time_step, 1)))
+            model.add(LSTM(50, return_sequences=False))
+            model.add(Dropout(0.2))
+            model.add(Dense(25))
+            model.add(Dense(1))
+
+            model.compile(optimizer='adam', loss='mean_squared_error')
+            model.fit(X_train, y_train, batch_size=64, epochs=10, verbose=1)
+
+            # 예측 및 시각화
+            predictions = model.predict(X_test)
+            predictions = scaler.inverse_transform(predictions)
+
+            # 예측 결과 출력
+            st.write("예측된 주가 결과:")
+            plt.figure(figsize=(14, 7))
+            plt.plot(scaler.inverse_transform(test_data[time_step:]), label="Actual Price")  # 실제 주가
+            plt.plot(predictions, label="Predicted Price")  # 예측 주가
+            plt.xlabel("Date")  # X축: 날짜
+            plt.ylabel("Price")  # Y축: 주가
+            plt.legend()
+            st.pyplot(plt)
+
+            # 예측된 주가를 기반으로 투자 판단
+            last_actual_price = scaler.inverse_transform(test_data[-1].reshape(1, -1))[0][0]
+            last_predicted_price = predictions[-1][0]
+
+            st.write(f"현재 주가: {last_actual_price:.2f} 원")
+            st.write(f"예측된 주가: {last_predicted_price:.2f} 원")
+
+            if last_predicted_price > last_actual_price:
+                st.write("예측에 따르면 주가는 상승할 것으로 예상됩니다. 투자를 고려해보세요.")
+            else:
+                st.write("예측에 따르면 주가는 하락할 것으로 예상됩니다. 신중히 판단하세요.")
