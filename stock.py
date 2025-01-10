@@ -7,6 +7,7 @@ from tensorflow.keras.layers import LSTM, Dense, Dropout
 from tensorflow.keras.callbacks import EarlyStopping
 import streamlit as st
 import matplotlib.pyplot as plt
+from sklearn.metrics import r2_score
 
 # 주식 데이터 다운로드
 data = yf.download('AAPL', start='2017-01-01', end='2024-01-01')
@@ -61,6 +62,9 @@ val_loss = history.history['val_loss'][-1]
 predictions = model.predict(X_test)
 predicted_prices = scaler.inverse_transform(predictions)
 
+# R² (결정 계수) 계산
+r2 = r2_score(scaler.inverse_transform(y_test.reshape(-1, 1)), predicted_prices)
+
 # Streamlit 앱 UI 설정
 st.title('AAPL 주식 가격 예측')
 st.subheader('예측된 주식 가격')
@@ -72,6 +76,9 @@ st.write(f"실제 가격: {scaler.inverse_transform(y_test.reshape(-1, 1))[:10]}
 # 훈련 및 검증 손실 값 표시
 st.write(f"훈련 손실 (train_loss): {train_loss}")
 st.write(f"검증 손실 (val_loss): {val_loss}")
+
+# R² 값 표시
+st.write(f"R² (결정 계수): {r2}")
 
 # 예측 결과 시각화
 plt.figure(figsize=(12, 6))
