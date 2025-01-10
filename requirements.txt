@@ -11,3 +11,4 @@ tensorflow
 tf-keras
 newspaper3k
 vaderSentiment
+lxml
