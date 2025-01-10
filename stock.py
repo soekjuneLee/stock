@@ -2,7 +2,6 @@ import yfinance as yf
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
-from sklearn.model_selection import train_test_split
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import LSTM, Dense, Dropout
 from tensorflow.keras.callbacks import EarlyStopping
@@ -51,8 +50,12 @@ model.compile(optimizer='adam', loss='mean_squared_error')
 # 과적합 방지를 위한 EarlyStopping 설정
 early_stopping = EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
 
-# 모델 학습
-model.fit(X_train, y_train, epochs=50, batch_size=32, validation_data=(X_test, y_test), callbacks=[early_stopping])
+# 모델 학습 (history 반환)
+history = model.fit(X_train, y_train, epochs=50, batch_size=32, validation_data=(X_test, y_test), callbacks=[early_stopping])
+
+# 훈련 및 검증 손실/정확도 추출
+train_loss = history.history['loss'][-1]
+val_loss = history.history['val_loss'][-1]
 
 # 예측 수행
 predictions = model.predict(X_test)
@@ -65,6 +68,10 @@ st.subheader('예측된 주식 가격')
 # 예측 가격과 실제 가격을 화면에 표시
 st.write(f"예측된 가격: {predicted_prices[:10]}")
 st.write(f"실제 가격: {scaler.inverse_transform(y_test.reshape(-1, 1))[:10]}")
+
+# 훈련 및 검증 손실 값 표시
+st.write(f"훈련 손실 (train_loss): {train_loss}")
+st.write(f"검증 손실 (val_loss): {val_loss}")
 
 # 예측 결과 시각화
 plt.figure(figsize=(12, 6))
