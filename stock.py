@@ -1,140 +1,87 @@
-import streamlit as st
-import requests
-from bs4 import BeautifulSoup
-import numpy as np
-from sklearn.preprocessing import MinMaxScaler
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dense, Dropout
+import yfinance as yf
+import pandas as pd
 import matplotlib.pyplot as plt
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+import requests
+from bs4 import BeautifulSoup
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
 
-# Streamlit UI 구성
-st.title("AI 기반 주식 투자 추천 프로그램")
+# 주식 데이터 가져오기
+def get_stock_data(ticker):
+    stock = yf.Ticker(ticker)
+    data = stock.history(period="1y")  # 최근 1년간 데이터
+    return data
 
-# 주식 종목 딕셔너리
-ticker_dict = {
-    "삼성전자": "005930.KS",
-    "기아": "000270.KS",
-    "현대차": "005380.KS",
-    "LG전자": "066570.KS",
-    "네이버": "035420.KS",
-    "카카오": "035720.KS",
-}
-
-# 사용자 입력 받기
-stock_name = st.selectbox("주식 종목 선택", list(ticker_dict.keys()))
-ticker = ticker_dict[stock_name]
-
-# 기간 및 데이터 옵션
-period = st.selectbox("기간 선택", ["1개월", "3개월", "6개월", "1년"])
-period_mapping = {"1개월": "1mo", "3개월": "3mo", "6개월": "6mo", "1년": "1y"}
-interval = st.selectbox("데이터 간격", ["일봉", "주봉"])
-interval_mapping = {"일봉": "1d", "주봉": "1wk"}
-
-# 뉴스 감정 분석 함수
+# 뉴스 감정 분석
 def get_news_sentiment(ticker):
-    # 주식 종목에 대한 최신 뉴스 URL을 가져오기
-    url = f"https://finance.yahoo.com/quote/{ticker}?p={ticker}&.tsrc=fin-srch"
+    url = f'https://finance.yahoo.com/quote/{ticker}?p={ticker}&.tsrc=fin-srch'  # Yahoo Finance 뉴스 페이지
     response = requests.get(url)
-    soup = BeautifulSoup(response.text, "html.parser")
-    
-    # 뉴스 기사 텍스트 추출 (example)
-    news_text = ""
-    for article in soup.find_all('p'):
-        news_text += article.get_text()
-    
-    # 감정 분석
+    soup = BeautifulSoup(response.text, 'html.parser')
+    news = soup.find_all('li', class_='js-stream-content')
+
     analyzer = SentimentIntensityAnalyzer()
-    sentiment = analyzer.polarity_scores(news_text)
+    sentiments = []
+    for article in news[:10]:  # 최근 10개의 뉴스만 가져오기
+        headline = article.find('h3').text
+        sentiment_score = analyzer.polarity_scores(headline)
+        sentiments.append(sentiment_score['compound'])
     
-    return sentiment['compound']  # -1 (부정) ~ 1 (긍정) 점수 반환
+    average_sentiment = sum(sentiments) / len(sentiments) if sentiments else 0
+    return average_sentiment
 
-# LSTM 기반 AI 주가 예측
-if st.button("AI 기반 주가 예측"):
-    # Yahoo Finance에서 주식 데이터 다운로드
-    url = f"https://query1.finance.yahoo.com/v7/finance/download/{ticker}?period1=0&period2=9999999999&interval={interval_mapping[interval]}&events=history"
-    data = requests.get(url).text.splitlines()
-    
-    # 데이터 처리 (CSV 포맷)
-    rows = [line.split(',') for line in data]
-    headers = rows[0]
-    data = rows[1:]
-    
+# 투자 여부 예측 모델 학습
+def train_model(stock_data, sentiment_data):
     # 데이터 전처리
-    dates = [row[0] for row in data]
-    prices = [float(row[4]) for row in data]  # 'Close' 가격만 사용
+    stock_data['Return'] = stock_data['Close'].pct_change()
+    stock_data['Target'] = (stock_data['Return'] > 0).astype(int)  # 수익률이 0 이상이면 1 (구매 신호), 아니면 0 (판매 신호)
+
+    # 특성 데이터 (주가 및 감정 분석)
+    X = stock_data[['Open', 'High', 'Low', 'Volume']].dropna()
+    X['Sentiment'] = sentiment_data
+    y = stock_data['Target'].dropna()
+
+    # 데이터 나누기
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+    # 모델 학습
+    model = LogisticRegression()
+    model.fit(X_train, y_train)
+
+    # 예측
+    y_pred = model.predict(X_test)
+
+    # 정확도 평가
+    accuracy = accuracy_score(y_test, y_pred)
+    print(f"모델 정확도: {accuracy:.2f}")
+    return model
+
+# 예측
+def predict_investment(ticker):
+    # 주식 데이터 가져오기
+    stock_data = get_stock_data(ticker)
+
+    # 뉴스 감정 분석
+    sentiment_score = get_news_sentiment(ticker)
+
+    # 모델 훈련 (이 부분은 첫 실행 시에만 필요)
+    # sentiment_data는 주가 데이터와 동일한 크기를 가져야 함
+    sentiment_data = [sentiment_score] * len(stock_data)  # 전체 기간에 대한 감정 점수 할당
+    model = train_model(stock_data, sentiment_data)
+
+    # 예측
+    latest_data = stock_data[['Open', 'High', 'Low', 'Volume']].iloc[-1:].copy()
+    latest_data['Sentiment'] = sentiment_score
+    prediction = model.predict(latest_data)
     
-    # 주식 데이터 준비
-    price_data = np.array(prices).reshape(-1, 1)
-    scaler = MinMaxScaler(feature_range=(0, 1))
-    scaled_data = scaler.fit_transform(price_data)
-
-    # 훈련 및 테스트 데이터 분리
-    train_size = int(len(scaled_data) * 0.8)
-    train_data = scaled_data[:train_size]
-    test_data = scaled_data[train_size:]
-
-    # LSTM 입력 데이터 준비
-    def create_dataset(dataset, time_step=50):
-        X, y = [], []
-        for i in range(len(dataset) - time_step - 1):
-            X.append(dataset[i:(i + time_step), 0])
-            y.append(dataset[i + time_step, 0])
-        return np.array(X), np.array(y)
-
-    time_step = 50
-    X_train, y_train = create_dataset(train_data, time_step)
-    X_test, y_test = create_dataset(test_data, time_step)
-
-    # 데이터가 충분한지 확인
-    if X_train.shape[0] == 0 or X_test.shape[0] == 0:
-        st.error("시간 스텝을 너무 크게 설정했습니다. 더 작은 값으로 설정해 주세요.")
+    if prediction == 1:
+        print(f"{ticker} 주식에 투자하세요!")
     else:
-        # X_train과 X_test reshape
-        X_train = X_train.reshape(X_train.shape[0], X_train.shape[1], 1)
-        X_test = X_test.reshape(X_test.shape[0], X_test.shape[1], 1)
+        print(f"{ticker} 주식은 투자하지 마세요.")
 
-        # 뉴스 감정 분석 추가
-        news_sentiment = get_news_sentiment(ticker)  # 뉴스 감정 분석 결과 얻기
-
-        # 감정 점수를 LSTM 모델에 추가 (예시: 마지막 데이터에 추가)
-        news_sentiment_scaled = scaler.transform([[news_sentiment]])  # 스케일링
-        X_train = np.concatenate([X_train, np.repeat(news_sentiment_scaled, X_train.shape[0], axis=0)], axis=2)
-        X_test = np.concatenate([X_test, np.repeat(news_sentiment_scaled, X_test.shape[0], axis=0)], axis=2)
-
-        # LSTM 모델 정의
-        model = Sequential()
-        model.add(LSTM(50, return_sequences=True, input_shape=(time_step, 2)))  # 2는 추가된 뉴스 감정의 채널 수
-        model.add(LSTM(50, return_sequences=False))
-        model.add(Dropout(0.2))
-        model.add(Dense(25))
-        model.add(Dense(1))
-
-        model.compile(optimizer='adam', loss='mean_squared_error')
-        model.fit(X_train, y_train, batch_size=64, epochs=10, verbose=1)
-
-        # 예측 및 시각화
-        predictions = model.predict(X_test)
-        predictions = scaler.inverse_transform(predictions)
-
-        # 예측 결과 출력
-        st.write("예측된 주가 결과:")
-        plt.figure(figsize=(14, 7))
-        plt.plot(scaler.inverse_transform(test_data[time_step:]), label="Actual Price")  # 실제 주가
-        plt.plot(predictions, label="Predicted Price")  # 예측 주가
-        plt.xlabel("Date")  # X축: 날짜
-        plt.ylabel("Price")  # Y축: 주가
-        plt.legend()
-        st.pyplot(plt)
-
-        # 예측된 주가를 기반으로 투자 판단
-        last_actual_price = scaler.inverse_transform(test_data[-1].reshape(1, -1))[0][0]
-        last_predicted_price = predictions[-1][0]
-
-        st.write(f"현재 주가: {last_actual_price:.2f} 원")
-        st.write(f"예측된 주가: {last_predicted_price:.2f} 원")
-
-        if last_predicted_price > last_actual_price:
-            st.write("예측에 따르면 주가는 상승할 것으로 예상됩니다. 투자를 고려해보세요.")
-        else:
-            st.write("예측에 따르면 주가는 하락할 것으로 예상됩니다. 신중히 판단하세요.")
+# 프로그램 실행
+if __name__ == "__main__":
+    ticker = 'AAPL'  # 예시: 애플 주식
+    predict_investment(ticker)
