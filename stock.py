@@ -14,8 +14,8 @@ symbol = 'AAPL'
 data = yf.download(symbol, start='2017-01-01', end=datetime.datetime.now().strftime('%Y-%m-%d'))
 close_prices = data['Close']
 
-# USD to KRW 환율 (Streamlit 실행 시 기준)
-usd_to_krw = 1300  # 예시 환율 (실제 환율을 API로 가져올 수도 있음)
+# USD to KRW 환율
+usd_to_krw = 1300  # 예시 환율
 
 # 데이터 정규화
 scaler = MinMaxScaler(feature_range=(0, 1))
@@ -44,9 +44,9 @@ X_test = X_test.reshape(X_test.shape[0], X_test.shape[1], 1)
 # LSTM 모델 구축
 model = Sequential()
 model.add(LSTM(units=100, return_sequences=True, input_shape=(X_train.shape[1], 1)))
-model.add(Dropout(0.2))  # 과적합 방지를 위한 Dropout
+model.add(Dropout(0.2))
 model.add(LSTM(units=100, return_sequences=False))
-model.add(Dropout(0.2))  # 과적합 방지를 위한 Dropout
+model.add(Dropout(0.2))
 model.add(Dense(units=1))
 
 # 모델 컴파일
@@ -60,44 +60,43 @@ model.fit(X_train, y_train, epochs=50, batch_size=32, validation_data=(X_test, y
 
 # 예측 수행
 predictions = model.predict(X_test)
-predicted_prices = scaler.inverse_transform(predictions) * usd_to_krw  # KRW로 변환
+predicted_prices = scaler.inverse_transform(predictions) * usd_to_krw
 y_test_original = scaler.inverse_transform(y_test.reshape(-1, 1)) * usd_to_krw
 
-# 최근 7일 데이터 및 미래 1일 예측
-date_index = data.index[-(len(y_test_original) + 60):]  # 테스트 데이터 날짜
-recent_data = scaled_data[-67:]  # 최근 7일 + 1일 예측
-
+# 최근 7일 데이터 및 내일 예측
+recent_data = scaled_data[-67:]  # 최근 60일 + 7일 (모델 입력용)
 X_recent = []
 for i in range(60, len(recent_data)):
     X_recent.append(recent_data[i-60:i, 0])
 X_recent = np.array(X_recent).reshape(len(X_recent), 60, 1)
 
-future_predictions = model.predict(X_recent)
-future_prices = scaler.inverse_transform(future_predictions) * usd_to_krw
+future_prediction = model.predict(X_recent[-1].reshape(1, 60, 1))
+future_price = scaler.inverse_transform(future_prediction) * usd_to_krw
 
 # 날짜 생성
-recent_dates = list(data.index[-7:])  # 최근 7일
-future_dates = [data.index[-1] + pd.Timedelta(days=i) for i in range(1, 2)]  # 미래 날짜
-all_dates = recent_dates + future_dates
+today = datetime.datetime.now()
+one_week_ago = today - datetime.timedelta(days=7)
+tomorrow = today + datetime.timedelta(days=1)
 
-# 실제 데이터와 예측 데이터 병합
+recent_dates = pd.date_range(start=one_week_ago, end=today).strftime('%Y-%m-%d')
+future_date = pd.date_range(start=today, end=tomorrow).strftime('%Y-%m-%d')
+
+# 실제 데이터 및 예측 데이터 결합
 actual_prices = close_prices[-7:] * usd_to_krw
-all_prices = list(actual_prices) + list(future_prices.flatten())  # 데이터 형식 일치
-
-# 데이터 길이 확인
-assert len(all_dates) == len(all_prices), "Dates and prices length mismatch!"
+predicted_prices = np.append(actual_prices[-1], future_price)
 
 # Streamlit 앱 UI 설정
 st.title(f'{symbol} 주식 가격 예측 (KRW)')
-st.subheader('최근 일주일 및 미래 1일 예측')
+st.subheader('최근 일주일 및 내일 예측')
 
 # 예측 결과 시각화
 plt.figure(figsize=(12, 6))
-plt.plot(recent_dates, actual_prices, color='blue', label='실제 가격')
-plt.plot(all_dates, all_prices, color='red', linestyle='--', label='예측 가격')
+plt.plot(recent_dates, actual_prices, label='실제 가격', color='blue', marker='o')
+plt.plot([recent_dates[-1], future_date[0]], predicted_prices, label='예측 가격', color='red', linestyle='--', marker='o')
 plt.title(f'{symbol} 주식 가격 예측')
 plt.xlabel('날짜')
 plt.ylabel('가격 (KRW)')
+plt.xticks(rotation=45)
 plt.legend()
 
 # Streamlit에서 플롯 표시
