@@ -93,7 +93,7 @@ future_dates = [date_index[-1] + datetime.timedelta(days=i) for i in range(1, 2)
 # 실제 데이터와 예측 데이터 병합
 actual_prices = close_prices[-7:] * usd_to_krw
 all_dates = list(recent_dates) + future_dates
-all_prices = list(actual_prices) + list(future_prices)
+all_prices = list(actual_prices) + list(future_prices.flatten())  # flatten()을 사용하여 예측된 가격의 1D 배열을 생성
 
 # Streamlit 앱 UI 설정
 st.title(f'{symbol} 주식 가격 예측 (KRW)')
