@@ -82,8 +82,8 @@ recent_dates = pd.date_range(start=one_week_ago, end=today).strftime('%Y-%m-%d')
 future_date = pd.date_range(start=today, end=tomorrow).strftime('%Y-%m-%d')
 
 # 실제 데이터 및 예측 데이터 결합
-actual_prices = close_prices[-7:] * usd_to_krw
-predicted_prices = np.append(actual_prices[-1], future_price)
+actual_prices = close_prices[-7:].values * usd_to_krw  # 최근 7일 실제 가격 (KRW 변환)
+predicted_prices = np.append(actual_prices[-1], future_price[0])  # 예측 데이터 추가
 
 # Streamlit 앱 UI 설정
 st.title(f'{symbol} 주식 가격 예측 (KRW)')
