@@ -7,7 +7,6 @@ from tensorflow.keras.layers import LSTM, Dense, Dropout
 from tensorflow.keras.callbacks import EarlyStopping
 import streamlit as st
 import matplotlib.pyplot as plt
-from sklearn.metrics import r2_score
 import datetime
 
 # 주식 데이터 다운로드
@@ -77,13 +76,16 @@ future_predictions = model.predict(X_recent)
 future_prices = scaler.inverse_transform(future_predictions) * usd_to_krw
 
 # 날짜 생성
-recent_dates = date_index[-7:]
-future_dates = [date_index[-1] + datetime.timedelta(days=i) for i in range(1, 2)]
+recent_dates = list(data.index[-7:])  # 최근 7일
+future_dates = [data.index[-1] + pd.Timedelta(days=i) for i in range(1, 2)]  # 미래 날짜
+all_dates = recent_dates + future_dates
 
 # 실제 데이터와 예측 데이터 병합
 actual_prices = close_prices[-7:] * usd_to_krw
-all_dates = list(recent_dates) + future_dates
-all_prices = list(actual_prices) + list(future_prices)
+all_prices = list(actual_prices) + list(future_prices.flatten())  # 데이터 형식 일치
+
+# 데이터 길이 확인
+assert len(all_dates) == len(all_prices), "Dates and prices length mismatch!"
 
 # Streamlit 앱 UI 설정
 st.title(f'{symbol} 주식 가격 예측 (KRW)')
