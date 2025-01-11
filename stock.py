@@ -46,7 +46,13 @@ else:
 
     train_data = np.array(train_data)
     train_labels = np.array(train_labels)
-    train_data = np.reshape(train_data, (train_data.shape[0], train_data.shape[1], 1))
+
+    # train_data의 차원 확인 및 reshape
+    if len(train_data.shape) == 2:
+        train_data = np.reshape(train_data, (train_data.shape[0], train_data.shape[1], 1))
+    else:
+        st.error("데이터 차원에 문제가 있습니다. 데이터를 확인해주세요.")
+        st.stop()
 
     # LSTM 모델 구축
     model = Sequential()
