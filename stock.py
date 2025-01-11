@@ -8,10 +8,15 @@ from tensorflow.keras.callbacks import EarlyStopping
 import streamlit as st
 import matplotlib.pyplot as plt
 from sklearn.metrics import r2_score
+import datetime
 
 # 주식 데이터 다운로드
-data = yf.download('AAPL', start='2017-01-01', end='2024-01-01')
+symbol = 'AAPL'
+data = yf.download(symbol, start='2017-01-01', end=datetime.datetime.now().strftime('%Y-%m-%d'))
 close_prices = data['Close']
+
+# USD to KRW 환율 (Streamlit 실행 시 기준)
+usd_to_krw = 1300  # 예시 환율 (실제 환율을 API로 가져올 수도 있음)
 
 # 데이터 정규화
 scaler = MinMaxScaler(feature_range=(0, 1))
@@ -51,42 +56,46 @@ model.compile(optimizer='adam', loss='mean_squared_error')
 # 과적합 방지를 위한 EarlyStopping 설정
 early_stopping = EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
 
-# 모델 학습 (history 반환)
-history = model.fit(X_train, y_train, epochs=50, batch_size=32, validation_data=(X_test, y_test), callbacks=[early_stopping])
-
-# 훈련 및 검증 손실/정확도 추출
-train_loss = history.history['loss'][-1]
-val_loss = history.history['val_loss'][-1]
+# 모델 학습
+model.fit(X_train, y_train, epochs=50, batch_size=32, validation_data=(X_test, y_test), callbacks=[early_stopping])
 
 # 예측 수행
 predictions = model.predict(X_test)
-predicted_prices = scaler.inverse_transform(predictions)
+predicted_prices = scaler.inverse_transform(predictions) * usd_to_krw  # KRW로 변환
+y_test_original = scaler.inverse_transform(y_test.reshape(-1, 1)) * usd_to_krw
 
-# R² (결정 계수) 계산
-r2 = r2_score(scaler.inverse_transform(y_test.reshape(-1, 1)), predicted_prices)
+# 최근 7일 데이터 및 미래 1일 예측
+date_index = data.index[-(len(y_test_original) + 60):]  # 테스트 데이터 날짜
+recent_data = scaled_data[-67:]  # 최근 7일 + 1일 예측
+
+X_recent = []
+for i in range(60, len(recent_data)):
+    X_recent.append(recent_data[i-60:i, 0])
+X_recent = np.array(X_recent).reshape(len(X_recent), 60, 1)
+
+future_predictions = model.predict(X_recent)
+future_prices = scaler.inverse_transform(future_predictions) * usd_to_krw
+
+# 날짜 생성
+recent_dates = date_index[-7:]
+future_dates = [date_index[-1] + datetime.timedelta(days=i) for i in range(1, 2)]
+
+# 실제 데이터와 예측 데이터 병합
+actual_prices = close_prices[-7:] * usd_to_krw
+all_dates = list(recent_dates) + future_dates
+all_prices = list(actual_prices) + list(future_prices)
 
 # Streamlit 앱 UI 설정
-st.title('AAPL 주식 가격 예측')
-st.subheader('예측된 주식 가격')
-
-# 예측 가격과 실제 가격을 화면에 표시
-st.write(f"예측된 가격: {predicted_prices[:10]}")
-st.write(f"실제 가격: {scaler.inverse_transform(y_test.reshape(-1, 1))[:10]}")
-
-# 훈련 및 검증 손실 값 표시
-st.write(f"훈련 손실 (train_loss): {train_loss}")
-st.write(f"검증 손실 (val_loss): {val_loss}")
-
-# R² 값 표시
-st.write(f"R² (결정 계수): {r2}")
+st.title(f'{symbol} 주식 가격 예측 (KRW)')
+st.subheader('최근 일주일 및 미래 1일 예측')
 
 # 예측 결과 시각화
 plt.figure(figsize=(12, 6))
-plt.plot(scaler.inverse_transform(y_test.reshape(-1, 1)), color='blue', label='실제 가격')
-plt.plot(predicted_prices, color='red', label='예측 가격')
-plt.title('AAPL 주식 가격 예측')
+plt.plot(recent_dates, actual_prices, color='blue', label='실제 가격')
+plt.plot(all_dates, all_prices, color='red', linestyle='--', label='예측 가격')
+plt.title(f'{symbol} 주식 가격 예측')
 plt.xlabel('날짜')
-plt.ylabel('가격 (USD)')
+plt.ylabel('가격 (KRW)')
 plt.legend()
 
 # Streamlit에서 플롯 표시
