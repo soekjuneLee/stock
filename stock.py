@@ -21,11 +21,11 @@ def normalise_windows(window_data):
 
 # 2. Build the model
 model = Sequential()
-model.add(LSTM(input_dim=1, output_dim=50, return_sequences=True))
+model.add(LSTM(units=50, input_shape=(X_train.shape[1], 1), return_sequences=True))
 model.add(Dropout(0.2))
 model.add(LSTM(100, return_sequences=False))
 model.add(Dropout(0.2))
-model.add(Dense(output_dim=1))
+model.add(Dense(units=1))
 model.add(Activation('linear'))
 
 start = time.time()
